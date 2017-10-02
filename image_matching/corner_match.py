@@ -1,36 +1,33 @@
 import os
 import cv2
 import numpy as np
-from PIL import Image
-from matplotlib import pyplot as plt
 
 
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
-src_image = r"C:\Users\lobanov\PycharmProjects\GeoTools\image_matching\4-А-1-эл.bmp"
-img = Image.open(src_image)
-print(os.path.splitext(os.path.basename(src_image))[0])
-temp_jpg = 'temp_image' + '.jpg'
-img.convert('RGB').save(temp_jpg, 'jpeg')
-# img_rgb = cv2.imread('opencv-template-matching-python-tutorial.jpg')
-img_rgb = cv2.imread(temp_jpg)
-img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
+src_image_path = r'/Users/vasily/!MyFiles/Coding/PycharmProjects/GeoTools/image_matching/4-А-1-эл.bmp'
 
-# template = cv2.imread('opencv-template-for-matching.jpg', 0)
-template = cv2.imread('match_small.jpg', 0)
-w, h = template.shape[::-1]
+# reading image in grayscale
+src_image_obj_gray = cv2.imread(src_image_path, 0)
+# getting src_image dimensions
+full_w, full_h = src_image_obj_gray.shape[::-1]
+print(full_w, full_h)
 
-res = cv2.matchTemplate(img_gray, template, cv2.TM_CCOEFF_NORMED)
+# setting the ROI
+ul_x1, ul_y1 = 0, 0
+ul_x2, ul_y2 = int(full_w/4), int(full_h/4)
+# src_image_obj_gray = src_image_obj_gray[0:0+int(full_w/4), 0:0+int(full_h/4)]
+
+template_image_obj_gray = cv2.imread('match_small.jpg', 0)
+w, h = template_image_obj_gray.shape[::-1]
+
+# insert ROI here
+result = cv2.matchTemplate(src_image_obj_gray, template_image_obj_gray, cv2.TM_CCOEFF_NORMED)
 threshold = 0.95
-loc = np.where(res >= threshold)
+location = np.where(result >= threshold)
 
-for pt in zip(*loc[::-1]):
-    cv2.rectangle(img_rgb, pt, (pt[0] + w - 1, pt[1] + h - 1), (255, 0, 0), 1)
+print(location)
+for point in zip(*location[::-1]):
+    print(point)
+    cv2.rectangle(
+        img=src_image_obj_gray, pt1=point, pt2=(point[0] + w - 1, point[1] + h - 1), color=100, thickness=1)
 
-# cv2.imshow('Detected', img_rgb)
-# cv2.waitKey(0)
-
-# plt.imshow(img_rgb, interpolation='nearest')
-# plt.show()
-
-cv2.imwrite('OUT.png', img_rgb)
-os.remove(temp_jpg)
+cv2.imwrite('OUT.png', src_image_obj_gray)
