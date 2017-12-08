@@ -9,6 +9,7 @@
 # Import arcpy module
 import arcpy
 import os
+import re
 import logging.handlers
 
 # setting up logging
@@ -25,47 +26,56 @@ threshold = -9999
 
 
 # Set the current workspace
-arcpy.env.workspace = "F:/!Test"
+arcpy.env.workspace = r"F:\SE"
 arcpy.env.overwriteOutput = True
-output_dir = r'F:\!Test\mask'
+output_dir = r'F:\test'
 
 # check out any necessary licenses
 arcpy.CheckOutExtension("Spatial")
 
 # Get and print a list of TIFs from the workspace
-rasters = arcpy.ListRasters("*", "TIF")
-for i, raster in enumerate(rasters):
+target_file_list = []
+for filename in os.listdir(arcpy.env.workspace):
+    if re.search(r'^S\d*E\d*.*\.tif$', filename, re.IGNORECASE) is not None:
+        target_file_list.append(filename)
+
+total_files = len(target_file_list)
+for i, raster in enumerate(target_file_list):
     # getting name without extension
     raster_name = os.path.splitext(raster)[0]
-    logger.info('{} / {} Working with {}'.format(i + 1, len(rasters), raster))
-    inRaster = arcpy.Raster(raster)
-    # Execute SetNull
-    logger.info('Setting Nulls...')
-    outSetNull = arcpy.sa.SetNull(inRaster, in_false_raster_or_constant=1, where_clause='Value <> %s' % threshold)
-    # check if the result is not empty
-    if arcpy.GetRasterProperties_management(outSetNull, "ALLNODATA").getOutput(0) == 1:
-        logger.info('Raster {} does not contain required values, skipping...'.format(raster))
+    logger.info('{} / {} Working with {}'.format(i + 1, total_files, raster))
+    if os.path.exists(os.path.join(output_dir, raster_name + '.shp')):
+        logger.info('Mask already exists, skipping...')
+        continue
     else:
-        mask_pol_v_lyr = os.path.sep.join(("in_memory", 'mask'))
-        # converting raster to vector mask using temporary 'in_memory' workspace
-        logger.info('Computing mask...')
-        arcpy.RasterToPolygon_conversion(outSetNull, mask_pol_v_lyr, simplify=True)
-        # buffering vector mask
-        mask_buff_v_lyr = os.path.sep.join(("in_memory", 'mask_buffered'))
-        logger.info('Buffering...')
-        arcpy.Buffer_analysis(
-            mask_pol_v_lyr, mask_buff_v_lyr, '30 Meters', dissolve_option='ALL')
-        # adding field with src raster ID
-        arcpy.AddField_management(mask_buff_v_lyr, 'INDEX', "TEXT", field_length=16)
-        # setting ID
-        cur = arcpy.UpdateCursor(mask_buff_v_lyr)
-        for row in cur:
-            row.setValue('INDEX', raster_name)
-            cur.updateRow(row)
-        arcpy.CopyFeatures_management(mask_buff_v_lyr, os.path.join(output_dir, raster_name + '.shp'))
-        # cleaning memory
-        logger.info('Mask exported!')
-    arcpy.Delete_management("in_memory")
+        inRaster = arcpy.Raster(raster)
+        # Execute SetNull
+        logger.info('Setting Nulls...')
+        outSetNull = arcpy.sa.SetNull(inRaster, in_false_raster_or_constant=1, where_clause='Value <> %s' % threshold)
+        # check if the result is not empty
+        if int(arcpy.GetRasterProperties_management(outSetNull, "ALLNODATA").getOutput(0)) == 1:
+            logger.info('Raster {} does not contain required values, skipping...'.format(raster))
+        else:
+            mask_pol_v_lyr = os.path.sep.join(("in_memory", 'mask'))
+            # converting raster to vector mask using temporary 'in_memory' workspace
+            logger.info('Computing mask...')
+            arcpy.RasterToPolygon_conversion(outSetNull, mask_pol_v_lyr, simplify=True)
+            # buffering vector mask
+            mask_buff_v_lyr = os.path.sep.join(("in_memory", 'mask_buffered'))
+            logger.info('Buffering...')
+            arcpy.Buffer_analysis(
+                mask_pol_v_lyr, mask_buff_v_lyr, '30 Meters', dissolve_option='ALL')
+            # adding field with src raster ID
+            arcpy.AddField_management(mask_buff_v_lyr, 'INDEX', "TEXT", field_length=16)
+            # setting ID
+            cur = arcpy.UpdateCursor(mask_buff_v_lyr)
+            for row in cur:
+                row.setValue('INDEX', raster_name)
+                cur.updateRow(row)
+            arcpy.CopyFeatures_management(mask_buff_v_lyr, os.path.join(output_dir, raster_name + '.shp'))
+            # cleaning memory
+            logger.info('Mask exported!')
+        arcpy.Delete_management("in_memory")
 
 
 
