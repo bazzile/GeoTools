@@ -8,6 +8,7 @@
 
 # Import arcpy module
 import arcpy
+import arcgisscripting
 import os
 import re
 import logging.handlers
@@ -28,7 +29,8 @@ threshold = -9999
 # Set the current workspace
 arcpy.env.workspace = r"F:\SE"
 arcpy.env.overwriteOutput = True
-output_dir = r'F:\test'
+output_dir = r'U:\PRJ\2017\BANS17\2_WORK\4_OTK\1_Empty'
+bad_file_log = r"U:\PRJ\2017\BANS17\2_WORK\4_OTK\!Bad_file_list.txt"
 
 # check out any necessary licenses
 arcpy.CheckOutExtension("Spatial")
@@ -62,20 +64,23 @@ for i, raster in enumerate(target_file_list):
             arcpy.RasterToPolygon_conversion(outSetNull, mask_pol_v_lyr, simplify=True)
             # buffering vector mask
             mask_buff_v_lyr = os.path.sep.join(("in_memory", 'mask_buffered'))
-            logger.info('Buffering...')
-            arcpy.Buffer_analysis(
-                mask_pol_v_lyr, mask_buff_v_lyr, '30 Meters', dissolve_option='ALL')
-            # adding field with src raster ID
-            arcpy.AddField_management(mask_buff_v_lyr, 'INDEX', "TEXT", field_length=16)
-            # setting ID
-            cur = arcpy.UpdateCursor(mask_buff_v_lyr)
-            for row in cur:
-                row.setValue('INDEX', raster_name)
-                cur.updateRow(row)
-            arcpy.CopyFeatures_management(mask_buff_v_lyr, os.path.join(output_dir, raster_name + '.shp'))
-            # cleaning memory
-            logger.info('Mask exported!')
-        arcpy.Delete_management("in_memory")
-
-
-
+            try:
+                logger.info('Buffering...')
+                arcpy.Buffer_analysis(
+                    mask_pol_v_lyr, mask_buff_v_lyr, '30 Meters', dissolve_option='ALL')
+                # adding field with src raster ID
+                arcpy.AddField_management(mask_buff_v_lyr, 'INDEX', "TEXT", field_length=16)
+                # setting ID
+                cur = arcpy.UpdateCursor(mask_buff_v_lyr)
+                for row in cur:
+                    row.setValue('INDEX', raster_name)
+                    cur.updateRow(row)
+                arcpy.CopyFeatures_management(mask_buff_v_lyr, os.path.join(output_dir, raster_name + '.shp'))
+                # cleaning memory
+                logger.info('Mask exported!')
+            except arcgisscripting.ExecuteError:
+                logger.error('ERROR 999999: Error executing function, writing to log and skipping...')
+                with open(bad_file_log, 'a') as f:
+                    f.write(raster_name + '\n')
+            finally:
+                arcpy.Delete_management("in_memory")
